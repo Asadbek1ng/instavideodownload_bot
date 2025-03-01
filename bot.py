@@ -4,30 +4,32 @@ import pinterest_downloader as pd
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import FSInputFile
 from aiogram.filters import Command
+import os
+import time
 
-TOKEN = "7566726307:AAFlaBenPmTZn_Xs4uchyWEO9l0Z4gtcnGs"
+TOKEN = "YOUR_BOT_TOKEN"
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-async def download_video(url):
+async def download_video(url, message_id):
+    unique_filename = f"video_{message_id}_{int(time.time())}.mp4"  # Har safar yangi nom
+
     if "pinterest.com" in url:
         try:
-            pin = pd.Pin(url)  # Pinterest yuklash
-            filename = "pinterest_video.mp4"
-            pin.video().download(filename=filename)
-            return filename
+            pin = pd.Pin(url)  
+            pin.video().download(filename=unique_filename)
+            return unique_filename
         except Exception as e:
             return f"❌ Pinterest yuklab olishda xatolik: {e}"
     else:
         options = {
             'format': 'best',
-            'outtmpl': 'video.%(ext)s',
+            'outtmpl': unique_filename,  # Fayl nomini o‘zgaruvchan qilish
         }
         with yt_dlp.YoutubeDL(options) as ydl:
             info_dict = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info_dict)
-            return filename
+            return unique_filename
 
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
@@ -38,7 +40,7 @@ async def handle_message(message: types.Message):
     url = message.text
     if any(site in url for site in ["tiktok.com", "youtube.com", "instagram.com", "pinterest.com"]):
         await message.answer("📥 Videoni yuklab olmoqdaman, kuting...")
-        filename = await download_video(url)
+        filename = await download_video(url, message.message_id)  # Har bir xabarga alohida fayl nomi
 
         if filename.startswith("❌"):
             await message.answer(filename)  # Xatolik bo‘lsa, xabar yuboriladi
@@ -46,6 +48,7 @@ async def handle_message(message: types.Message):
             try:
                 video = FSInputFile(filename)
                 await message.answer_video(video)
+                os.remove(filename)  # Yuborilgandan keyin faylni o‘chirish
             except Exception as e:
                 await message.answer(f"❌ Xatolik yuz berdi: {e}")
     else:
